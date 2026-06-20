@@ -1,0 +1,20 @@
+package com.arquivodigital.entity;
+
+public enum AcaoLog {
+    REGISTO,
+    LOGIN,
+    LOGOUT,
+    UPLOAD,
+    DOWNLOAD,
+    STREAMING,
+    DELETE_DOCUMENTARIO,
+    UPDATE_DOCUMENTARIO,
+    UPDATE_PERFIL,
+    CHANGE_PASSWORD,
+    COMPRESSAO,
+    ADMIN_UPDATE_USER,
+    ADMIN_DELETE_USER,
+    ADMIN_CHANGE_ROLE,
+    ADMIN_TOGGLE_USER,
+    SESSAO_REVOGADA
+}
