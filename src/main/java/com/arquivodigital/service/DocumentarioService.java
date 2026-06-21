@@ -218,7 +218,7 @@ public class DocumentarioService {
         }
     }
 
-    private DocumentarioResponse toResponse(Documentario doc) {
+    public DocumentarioResponse toResponse(Documentario doc) {
         String urlStreaming = BASE_URL + "/api/streaming/" + doc.getId();
         String urlDownload = BASE_URL + "/api/documentarios/" + doc.getId() + "/download";
         String urlThumbnail = fileStorageUtil.existe(doc.getCaminhoThumbnail())
