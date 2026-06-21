@@ -11,6 +11,7 @@ import com.arquivodigital.repository.DocumentarioRepository;
 import com.arquivodigital.util.FileStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,7 +34,8 @@ public class DocumentarioService {
     private final CompressaoService compressaoService;
     private final LogService logService;
 
-    private static final String BASE_URL = "http://localhost:8080";
+    @Value("${arquivo.server.base-url:http://localhost:8080}")
+    private String BASE_URL;
 
     @Transactional
     public DocumentarioResponse upload(MultipartFile ficheiro, DocumentarioRequest request, Utilizador utilizador, String ip) {
