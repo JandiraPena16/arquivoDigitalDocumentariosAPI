@@ -44,6 +44,10 @@ public class SecurityConfig {
                         .requestMatchers(SWAGGER_WHITELIST).permitAll()
                         // Auth público
                         .requestMatchers("/api/auth/login", "/api/auth/registar").permitAll()
+                        // Sinalização WebSocket (JWT validado no handshake via query param)
+                        .requestMatchers("/ws/**").permitAll()
+                        // Lives activas — listagem pública
+                        .requestMatchers(HttpMethod.GET, "/api/lives/**").permitAll()
                         // Streaming público (com token opcional)
                         .requestMatchers(HttpMethod.GET, "/api/streaming/**").permitAll()
                         // Categorias — leitura pública
