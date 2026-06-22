@@ -7,6 +7,7 @@ import com.arquivodigital.dto.response.PageResponse;
 import com.arquivodigital.entity.*;
 import com.arquivodigital.exception.custom.NegocioException;
 import com.arquivodigital.exception.custom.ResourceNotFoundException;
+import com.arquivodigital.repository.AvaliacaoRepository;
 import com.arquivodigital.repository.DocumentarioRepository;
 import com.arquivodigital.util.FileStorageUtil;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import java.util.List;
 public class DocumentarioService {
 
     private final DocumentarioRepository documentarioRepository;
+    private final AvaliacaoRepository avaliacaoRepository;
     private final FileStorageUtil fileStorageUtil;
     private final CategoriaService categoriaService;
     private final CompressaoService compressaoService;
@@ -192,6 +194,51 @@ public class DocumentarioService {
         logService.registar(AcaoLog.COMPRESSAO, "Recompressão iniciada para: " + doc.getTitulo(), admin, ip);
     }
 
+    @Transactional
+    public DocumentarioResponse atualizarCapa(Long id, MultipartFile imagem, Utilizador utilizador) {
+        Documentario doc = buscarEntidade(id);
+        verificarPropriedade(doc, utilizador);
+        fileStorageUtil.eliminar(doc.getCaminhoThumbnail());
+        String novaCapa = fileStorageUtil.guardarCapa(imagem);
+        doc.setCaminhoThumbnail(novaCapa);
+        return toResponse(documentarioRepository.save(doc));
+    }
+
+    @Transactional
+    public DocumentarioResponse substituirVideo(Long id, MultipartFile ficheiro, Utilizador utilizador, String ip) {
+        validarFicheiroVideo(ficheiro);
+        Documentario doc = buscarEntidade(id);
+        verificarPropriedade(doc, utilizador);
+
+        // Apagar ficheiros antigos
+        fileStorageUtil.eliminar(doc.getCaminhoOriginal());
+        fileStorageUtil.eliminar(doc.getCaminhoComprimido());
+        fileStorageUtil.eliminar(doc.getCaminhoThumbnail());
+        fileStorageUtil.eliminar(doc.getCaminhoLegendas());
+
+        String novoOriginal = fileStorageUtil.guardarOriginal(ficheiro);
+        doc.setCaminhoOriginal(novoOriginal);
+        doc.setCaminhoComprimido(null);
+        doc.setCaminhoThumbnail(null);
+        doc.setCaminhoLegendas(null);
+        doc.setTamanhoOriginalBytes(ficheiro.getSize());
+        doc.setTamanhoComprimidoBytes(null);
+        doc.setTaxaCompressao(null);
+        doc.setTempoProcessamentoMs(null);
+        doc.setDuracaoSegundos(null);
+        doc.setFormato(FileStorageUtil.obterExtensao(ficheiro.getOriginalFilename()));
+        doc.setStatus(StatusDocumentario.PENDENTE);
+
+        doc = documentarioRepository.save(doc);
+        final Long docId = doc.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { compressaoService.comprimirAsync(docId); }
+        });
+
+        logService.registar(AcaoLog.UPLOAD, "Substituição de vídeo: " + doc.getTitulo(), utilizador, ip);
+        return toResponse(doc);
+    }
+
     public Documentario buscarEntidade(Long id) {
         return documentarioRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Documentário não encontrado: " + id));
@@ -224,6 +271,9 @@ public class DocumentarioService {
         String urlThumbnail = fileStorageUtil.existe(doc.getCaminhoThumbnail())
                 ? BASE_URL + "/api/streaming/" + doc.getId() + "/thumbnail"
                 : null;
+        String urlLegendas = fileStorageUtil.existe(doc.getCaminhoLegendas())
+                ? BASE_URL + "/api/streaming/" + doc.getId() + "/legendas"
+                : null;
 
         return DocumentarioResponse.builder()
                 .id(doc.getId())
@@ -240,6 +290,8 @@ public class DocumentarioService {
                 .urlStreaming(urlStreaming)
                 .urlDownload(urlDownload)
                 .urlThumbnail(urlThumbnail)
+                .urlLegendas(urlLegendas)
+                .likeCount(avaliacaoRepository.countLikesByDocumentarioId(doc.getId()))
                 .tamanhoOriginalBytes(doc.getTamanhoOriginalBytes())
                 .tamanhoComprimidoBytes(doc.getTamanhoComprimidoBytes())
                 .taxaCompressao(doc.getTaxaCompressao())

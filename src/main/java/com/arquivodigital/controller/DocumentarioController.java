@@ -195,4 +195,31 @@ public class DocumentarioController {
         documentarioService.recomprimir(id, admin, httpRequest.getRemoteAddr());
         return ResponseEntity.accepted().body(Map.of("mensagem", "Recompressão iniciada. Verifique o estado em GET /api/documentarios/" + id));
     }
+
+    @PostMapping(value = "/{id}/atualizar-capa", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Atualizar a capa (thumbnail) do documentário (dono ou ADMIN)",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<DocumentarioResponse> atualizarCapa(
+            @PathVariable Long id,
+            @RequestPart("imagem") MultipartFile imagem,
+            @AuthenticationPrincipal UserDetailsImpl principal
+    ) {
+        Utilizador utilizador = utilizadorService.buscarEntidade(principal.getId());
+        return ResponseEntity.ok(documentarioService.atualizarCapa(id, imagem, utilizador));
+    }
+
+    @PostMapping(value = "/{id}/substituir-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Substituir o ficheiro de vídeo (dono ou ADMIN) — reinicia processamento",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<DocumentarioResponse> substituirVideo(
+            @PathVariable Long id,
+            @RequestPart("ficheiro") MultipartFile ficheiro,
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            HttpServletRequest httpRequest
+    ) {
+        Utilizador utilizador = utilizadorService.buscarEntidade(principal.getId());
+        return ResponseEntity.ok(documentarioService.substituirVideo(id, ficheiro, utilizador, httpRequest.getRemoteAddr()));
+    }
 }

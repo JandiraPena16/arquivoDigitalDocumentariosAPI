@@ -32,6 +32,9 @@ public class DocumentarioResponse {
     @Schema(description = "URL do thumbnail")
     private String urlThumbnail;
 
+    @Schema(description = "URL das legendas automáticas (WebVTT), null se não disponível")
+    private String urlLegendas;
+
     // Compressão
     private Long tamanhoOriginalBytes;
     private Long tamanhoComprimidoBytes;
@@ -43,6 +46,7 @@ public class DocumentarioResponse {
     // Métricas
     private Long visualizacoes;
     private Long downloads;
+    private Long likeCount;
 
     private LocalDateTime dataCriacao;
     private LocalDateTime dataAtualizacao;

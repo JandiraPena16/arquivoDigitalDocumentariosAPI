@@ -38,19 +38,18 @@ public class HistoricoService {
 
         Optional<HistoricoItem> existente = historicoRepository.findByUtilizadorAndDocumentario(utilizador, doc);
         if (existente.isPresent()) {
-            // Atualiza timestamp para o mais recente
+            // Utilizador já assistiu — apenas atualiza o timestamp, não conta nova visualização
             existente.get().setDataVisto(LocalDateTime.now());
             historicoRepository.save(existente.get());
         } else {
+            // Primeira vez que este utilizador assiste — cria entrada E conta visualização
             historicoRepository.save(HistoricoItem.builder()
                     .utilizador(utilizador)
                     .documentario(doc)
                     .dataVisto(LocalDateTime.now())
                     .build());
+            documentarioRepository.incrementarVisualizacoes(docId);
         }
-
-        // Incrementa visualizações no documentário
-        documentarioRepository.incrementarVisualizacoes(docId);
     }
 
     @Transactional

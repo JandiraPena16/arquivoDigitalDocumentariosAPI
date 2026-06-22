@@ -33,6 +33,8 @@ public class Documentario {
 
     private String caminhoThumbnail;
 
+    private String caminhoLegendas;
+
     // Estatísticas de compressão
     private Long tamanhoOriginalBytes;
     private Long tamanhoComprimidoBytes;

@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -27,11 +28,15 @@ public class FileStorageUtil {
     @Value("${arquivo.storage.temp}")
     private String dirTemp;
 
+    @Value("${arquivo.storage.legendas:./uploads/legendas}")
+    private String dirLegendas;
+
     public void inicializar() {
         criarDiretorio(dirOriginais);
         criarDiretorio(dirComprimidos);
         criarDiretorio(dirThumbnails);
         criarDiretorio(dirTemp);
+        criarDiretorio(dirLegendas);
         log.info("Diretorios de armazenamento iniciados");
     }
 
@@ -55,6 +60,26 @@ public class FileStorageUtil {
         String nome = original.getFileName().toString();
         String semExtensao = nome.contains(".") ? nome.substring(0, nome.lastIndexOf('.')) : nome;
         return Paths.get(dirThumbnails, semExtensao + "_thumb.jpg").toAbsolutePath().toString();
+    }
+
+    public String guardarCapa(MultipartFile imagem) {
+        String extensao = obterExtensao(imagem.getOriginalFilename());
+        if (!List.of("jpg", "jpeg", "png", "webp").contains(extensao)) extensao = "jpg";
+        String nomeUnico = UUID.randomUUID() + "_capa." + extensao;
+        Path destino = Paths.get(dirThumbnails, nomeUnico);
+        guardarFicheiro(imagem, destino);
+        return destino.toAbsolutePath().toString();
+    }
+
+    public String gerarCaminhoLegendas(String caminhoOriginal) {
+        Path original = Paths.get(caminhoOriginal);
+        String nome = original.getFileName().toString();
+        String semExtensao = nome.contains(".") ? nome.substring(0, nome.lastIndexOf('.')) : nome;
+        return Paths.get(dirLegendas, semExtensao + ".vtt").toAbsolutePath().toString();
+    }
+
+    public String getDirTemp() {
+        return dirTemp;
     }
 
     public void eliminar(String caminho) {

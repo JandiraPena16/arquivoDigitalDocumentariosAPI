@@ -1,16 +1,21 @@
 package com.arquivodigital.controller;
 
+import com.arquivodigital.entity.Documentario;
 import com.arquivodigital.entity.Utilizador;
 import com.arquivodigital.security.UserDetailsImpl;
+import com.arquivodigital.service.DocumentarioService;
 import com.arquivodigital.service.StreamingService;
 import com.arquivodigital.service.UtilizadorService;
+import com.arquivodigital.util.FileStorageUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +28,8 @@ public class StreamingController {
 
     private final StreamingService streamingService;
     private final UtilizadorService utilizadorService;
+    private final DocumentarioService documentarioService;
+    private final FileStorageUtil fileStorageUtil;
 
     @GetMapping("/{id}")
     @Operation(
@@ -60,5 +67,20 @@ public class StreamingController {
     @Operation(summary = "Obter thumbnail do documentário")
     public ResponseEntity<Resource> thumbnail(@PathVariable Long id) {
         return streamingService.thumbnail(id);
+    }
+
+    @GetMapping("/{id}/legendas")
+    @Operation(summary = "Obter ficheiro de legendas WebVTT do documentário")
+    public ResponseEntity<Resource> legendas(@PathVariable Long id) {
+        Documentario doc = documentarioService.buscarEntidade(id);
+        if (doc.getCaminhoLegendas() == null || !fileStorageUtil.existe(doc.getCaminhoLegendas())) {
+            return ResponseEntity.notFound().build();
+        }
+        Resource resource = new FileSystemResource(doc.getCaminhoLegendas());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/vtt"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                .body(resource);
     }
 }

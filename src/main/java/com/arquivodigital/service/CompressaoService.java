@@ -8,6 +8,7 @@ import com.arquivodigital.exception.custom.ResourceNotFoundException;
 import com.arquivodigital.repository.DocumentarioRepository;
 import com.arquivodigital.util.FFmpegUtil;
 import com.arquivodigital.util.FileStorageUtil;
+import com.arquivodigital.util.WhisperUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CompressaoService {
 
     private final FFmpegUtil ffmpegUtil;
+    private final WhisperUtil whisperUtil;
     private final FileStorageUtil fileStorageUtil;
     private final DocumentarioRepository documentarioRepository;
     private final LogService logService;
@@ -68,6 +70,16 @@ public class CompressaoService {
             doc.setFormato("MP4");
             if (duracao != null) doc.setDuracaoSegundos(duracao);
             doc.setStatus(StatusDocumentario.PRONTO);
+
+            // Legendas automáticas via Whisper (não bloqueia se Whisper não estiver disponível)
+            try {
+                String caminhoLegendas = fileStorageUtil.gerarCaminhoLegendas(doc.getCaminhoOriginal());
+                whisperUtil.gerarLegendas(doc.getCaminhoOriginal(), caminhoLegendas);
+                doc.setCaminhoLegendas(caminhoLegendas);
+                log.info("Legendas geradas com sucesso para doc {}", documentarioId);
+            } catch (Exception e) {
+                log.warn("Nao foi possivel gerar legendas para doc {}: {}", documentarioId, e.getMessage());
+            }
 
             documentarioRepository.save(doc);
             log.info("Compressao concluida para doc {}: {}% reducao", documentarioId, String.format("%.1f", taxa));

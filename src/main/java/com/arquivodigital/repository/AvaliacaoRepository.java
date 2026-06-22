@@ -16,4 +16,7 @@ public interface AvaliacaoRepository extends JpaRepository<Avaliacao, Long> {
     @Modifying
     @Query("DELETE FROM Avaliacao a WHERE a.utilizador = :u AND a.documentario = :d")
     void deleteByUtilizadorAndDocumentario(@Param("u") Utilizador utilizador, @Param("d") Documentario documentario);
+
+    @Query("SELECT COUNT(a) FROM Avaliacao a WHERE a.documentario.id = :docId AND a.valor = 1")
+    long countLikesByDocumentarioId(@Param("docId") Long docId);
 }
