@@ -6,6 +6,7 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Representa uma transmissão ao vivo em curso (mantida em memória).
@@ -25,6 +26,10 @@ public class LiveSession {
 
     /** sessionIds (WebSocket) dos espectadores ligados. */
     private final Set<String> espectadores = ConcurrentHashMap.newKeySet();
+
+    /** Reações acumuladas durante a transmissão. */
+    private final AtomicInteger likes = new AtomicInteger(0);
+    private final AtomicInteger dislikes = new AtomicInteger(0);
 
     public LiveSession(String liveId, String broadcasterSessionId, Long broadcasterUserId,
                        String broadcasterNome, String titulo) {

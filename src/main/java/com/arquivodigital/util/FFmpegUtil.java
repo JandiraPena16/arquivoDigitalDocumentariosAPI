@@ -32,6 +32,9 @@ public class FFmpegUtil {
     @Value("${arquivo.compressao.preset}")
     private String preset;
 
+    @Value("${arquivo.compressao.webp-quality:90}")
+    private String webpQuality;
+
     /**
      * Comprime vídeo com H.264 (libx264) usando FFmpeg.
      * Retorna o tempo de processamento em ms.
@@ -69,6 +72,25 @@ public class FFmpegUtil {
                 saida
         );
         return executar(cmd, "Compressão H.265");
+    }
+
+    /**
+     * Comprime uma imagem (capa) para WebP de alta qualidade.
+     * Usa quality=90 (visualmente sem perda) e o codificador libwebp do FFmpeg,
+     * reduzindo significativamente o tamanho face a JPEG/PNG sem degradação visível.
+     * Retorna o tempo de processamento em ms.
+     */
+    public long comprimirImagemWebp(String entrada, String saida) {
+        List<String> cmd = List.of(
+                ffmpegPath,
+                "-i", entrada,
+                "-c:v", "libwebp",
+                "-quality", webpQuality,
+                "-preset", "picture",
+                "-y",
+                saida
+        );
+        return executar(cmd, "Compressão de imagem (WebP)");
     }
 
     /**

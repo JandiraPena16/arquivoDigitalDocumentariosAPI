@@ -74,6 +74,8 @@ public class SignalingHandler extends TextWebSocketHandler {
                 case "start"  -> aoIniciar(session, msg);
                 case "join"   -> aoEntrar(session, msg);
                 case "offer", "answer", "ice" -> reencaminhar(session, msg, type);
+                case "chat"     -> aoChat(session, msg);
+                case "reaction" -> aoReacao(session, msg);
                 case "stop"   -> aoTerminar(session);
                 case "leave"  -> aoSair(session);
                 default -> log.warn("Tipo de mensagem desconhecido: {}", type);
@@ -115,6 +117,13 @@ public class SignalingHandler extends TextWebSocketHandler {
         resp.put("selfId", session.getId());
         enviar(session, resp);
 
+        // Envia as contagens de reações actuais ao novo espectador
+        ObjectNode counts = mapper.createObjectNode();
+        counts.put("type", "reaction");
+        counts.put("likes", live.getLikes().get());
+        counts.put("dislikes", live.getDislikes().get());
+        enviar(session, counts);
+
         // Notifica o emissor para criar a ligação P2P com este espectador
         WebSocketSession broadcaster = sessoes.get(live.getBroadcasterSessionId());
         if (broadcaster != null) {
@@ -139,6 +148,63 @@ public class SignalingHandler extends TextWebSocketHandler {
         if (msg.has("sdp")) out.set("sdp", msg.get("sdp"));
         if (msg.has("candidate")) out.set("candidate", msg.get("candidate"));
         enviar(destino, out);
+    }
+
+    /** Mensagem de chat — difundida a todos os participantes da live. */
+    private void aoChat(WebSocketSession session, JsonNode msg) {
+        String texto = texto(msg, "texto");
+        if (texto == null || texto.isBlank()) return;
+        LiveSession live = liveDaSessao(session);
+        if (live == null) return;
+
+        ObjectNode out = mapper.createObjectNode();
+        out.put("type", "chat");
+        out.put("nome", nomeApresentacao(session));
+        out.put("texto", texto.length() > 500 ? texto.substring(0, 500) : texto);
+        difundir(live, out);
+    }
+
+    /** Reação (like/dislike) — actualiza o total e difunde a todos. */
+    private void aoReacao(WebSocketSession session, JsonNode msg) {
+        String tipo = texto(msg, "tipo");
+        LiveSession live = liveDaSessao(session);
+        if (live == null || tipo == null) return;
+
+        if ("like".equals(tipo)) live.getLikes().incrementAndGet();
+        else if ("dislike".equals(tipo)) live.getDislikes().incrementAndGet();
+        else return;
+
+        ObjectNode out = mapper.createObjectNode();
+        out.put("type", "reaction");
+        out.put("likes", live.getLikes().get());
+        out.put("dislikes", live.getDislikes().get());
+        difundir(live, out);
+    }
+
+    /** Descobre a que live pertence uma sessão (emissor ou espectador). */
+    private LiveSession liveDaSessao(WebSocketSession session) {
+        LiveSession live = registry.porBroadcasterSession(session.getId()).orElse(null);
+        if (live != null) return live;
+        String liveId = espectadorParaLive.get(session.getId());
+        return liveId != null ? registry.porId(liveId).orElse(null) : null;
+    }
+
+    /** Envia uma mensagem a todos os participantes (emissor + espectadores). */
+    private void difundir(LiveSession live, ObjectNode payload) {
+        WebSocketSession broadcaster = sessoes.get(live.getBroadcasterSessionId());
+        if (broadcaster != null) enviar(broadcaster, payload);
+        for (String viewerId : live.getEspectadores()) {
+            WebSocketSession v = sessoes.get(viewerId);
+            if (v != null) enviar(v, payload);
+        }
+    }
+
+    /** Nome curto para apresentação (parte antes do @ do email). */
+    private String nomeApresentacao(WebSocketSession session) {
+        String nome = (String) session.getAttributes().get(JwtHandshakeInterceptor.ATTR_NOME);
+        if (nome == null) return "Anónimo";
+        int at = nome.indexOf('@');
+        return at > 0 ? nome.substring(0, at) : nome;
     }
 
     private void aoTerminar(WebSocketSession session) {

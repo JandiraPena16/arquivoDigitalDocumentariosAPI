@@ -9,6 +9,7 @@ import com.arquivodigital.exception.custom.NegocioException;
 import com.arquivodigital.exception.custom.ResourceNotFoundException;
 import com.arquivodigital.repository.AvaliacaoRepository;
 import com.arquivodigital.repository.DocumentarioRepository;
+import com.arquivodigital.util.FFmpegUtil;
 import com.arquivodigital.util.FileStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class DocumentarioService {
     private final DocumentarioRepository documentarioRepository;
     private final AvaliacaoRepository avaliacaoRepository;
     private final FileStorageUtil fileStorageUtil;
+    private final FFmpegUtil ffmpegUtil;
     private final CategoriaService categoriaService;
     private final CompressaoService compressaoService;
     private final LogService logService;
@@ -199,8 +201,25 @@ public class DocumentarioService {
         Documentario doc = buscarEntidade(id);
         verificarPropriedade(doc, utilizador);
         fileStorageUtil.eliminar(doc.getCaminhoThumbnail());
-        String novaCapa = fileStorageUtil.guardarCapa(imagem);
-        doc.setCaminhoThumbnail(novaCapa);
+
+        // Guarda o original e comprime para WebP de alta qualidade (sem perda visível)
+        String original = fileStorageUtil.guardarCapa(imagem);
+        String webp = fileStorageUtil.gerarCaminhoWebp(original);
+        try {
+            ffmpegUtil.comprimirImagemWebp(original, webp);
+            long origBytes = fileStorageUtil.tamanhoFicheiro(original);
+            long compBytes = fileStorageUtil.tamanhoFicheiro(webp);
+            double taxa = origBytes > 0 ? (1.0 - (double) compBytes / origBytes) * 100 : 0;
+            log.info("Capa comprimida (WebP) doc {}: {} -> {} ({}% reducao)", id,
+                    FileStorageUtil.formatarBytes(origBytes), FileStorageUtil.formatarBytes(compBytes),
+                    String.format("%.1f", taxa));
+            fileStorageUtil.eliminar(original);   // mantém apenas o WebP
+            doc.setCaminhoThumbnail(webp);
+        } catch (Exception e) {
+            // Se a compressão falhar, mantém o original sem bloquear o utilizador
+            log.warn("Falha ao comprimir capa para WebP (doc {}): {}. A usar original.", id, e.getMessage());
+            doc.setCaminhoThumbnail(original);
+        }
         return toResponse(documentarioRepository.save(doc));
     }
 

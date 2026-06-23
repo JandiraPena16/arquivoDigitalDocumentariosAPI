@@ -85,8 +85,13 @@ public class StreamingService {
             throw new ResourceNotFoundException("Thumbnail não disponível para este documentário");
         }
 
+        String caminho = doc.getCaminhoThumbnail().toLowerCase();
+        String tipo = caminho.endsWith(".webp") ? "image/webp"
+                : caminho.endsWith(".png") ? MediaType.IMAGE_PNG_VALUE
+                : MediaType.IMAGE_JPEG_VALUE;
+
         HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_JPEG_VALUE);
+        headers.set(HttpHeaders.CONTENT_TYPE, tipo);
         return ResponseEntity.ok().headers(headers)
                 .body(new FileSystemResource(fileStorageUtil.obterPath(doc.getCaminhoThumbnail())));
     }

@@ -78,6 +78,14 @@ public class FileStorageUtil {
         return Paths.get(dirLegendas, semExtensao + ".vtt").toAbsolutePath().toString();
     }
 
+    /** Gera um caminho .webp na pasta de thumbnails, derivado do ficheiro de origem. */
+    public String gerarCaminhoWebp(String origem) {
+        Path p = Paths.get(origem);
+        String nome = p.getFileName().toString();
+        String semExtensao = nome.contains(".") ? nome.substring(0, nome.lastIndexOf('.')) : nome;
+        return Paths.get(dirThumbnails, semExtensao + ".webp").toAbsolutePath().toString();
+    }
+
     public String getDirTemp() {
         return dirTemp;
     }
