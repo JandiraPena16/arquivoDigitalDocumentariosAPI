@@ -48,6 +48,12 @@ public class DocumentarioResponse {
     private Long downloads;
     private Long likeCount;
 
+    // Classificação por estrelas (derivada dos likes/dislikes, com suavização)
+    @Schema(description = "Média de estrelas (0-5) calculada a partir do rácio de likes")
+    private Double mediaEstrelas;
+    @Schema(description = "Total de avaliações (likes + dislikes)")
+    private Long totalAvaliacoes;
+
     private LocalDateTime dataCriacao;
     private LocalDateTime dataAtualizacao;
 }

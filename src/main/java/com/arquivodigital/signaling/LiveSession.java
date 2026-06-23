@@ -4,9 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Representa uma transmissão ao vivo em curso (mantida em memória).
@@ -27,9 +27,32 @@ public class LiveSession {
     /** sessionIds (WebSocket) dos espectadores ligados. */
     private final Set<String> espectadores = ConcurrentHashMap.newKeySet();
 
-    /** Reações acumuladas durante a transmissão. */
-    private final AtomicInteger likes = new AtomicInteger(0);
-    private final AtomicInteger dislikes = new AtomicInteger(0);
+    /** Reação de cada utilizador: userId -> "like" | "dislike" (uma por pessoa). */
+    private final Map<Long, String> reacoes = new ConcurrentHashMap<>();
+
+    /**
+     * Aplica a reação de um utilizador com toggle:
+     * - mesma reação outra vez -> remove (anula)
+     * - reação diferente -> troca (ex.: like passa a dislike)
+     * - sem reação -> adiciona
+     */
+    public void aplicarReacao(Long userId, String tipo) {
+        if (userId == null || tipo == null) return;
+        String atual = reacoes.get(userId);
+        if (tipo.equals(atual)) {
+            reacoes.remove(userId);
+        } else {
+            reacoes.put(userId, tipo);
+        }
+    }
+
+    public int getLikes() {
+        return (int) reacoes.values().stream().filter("like"::equals).count();
+    }
+
+    public int getDislikes() {
+        return (int) reacoes.values().stream().filter("dislike"::equals).count();
+    }
 
     public LiveSession(String liveId, String broadcasterSessionId, Long broadcasterUserId,
                        String broadcasterNome, String titulo) {

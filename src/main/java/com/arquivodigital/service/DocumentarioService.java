@@ -41,6 +41,12 @@ public class DocumentarioService {
     @Value("${arquivo.server.base-url:http://localhost:8080}")
     private String BASE_URL;
 
+    @Value("${arquivo.avaliacao.baseline:0.7}")
+    private double estrelaBaseline;
+
+    @Value("${arquivo.avaliacao.peso:5}")
+    private double estrelaPeso;
+
     @Transactional
     public DocumentarioResponse upload(MultipartFile ficheiro, DocumentarioRequest request, Utilizador utilizador, String ip) {
         validarFicheiroVideo(ficheiro);
@@ -284,6 +290,16 @@ public class DocumentarioService {
         }
     }
 
+    /**
+     * Calcula a média de estrelas (0-5) a partir dos likes/dislikes, com
+     * suavização m-estimate para evitar que poucos votos deem 5★.
+     * proporção = (likes + peso·baseline) / (likes + dislikes + peso)
+     */
+    private double calcularMediaEstrelas(long likes, long dislikes) {
+        double proporcao = (likes + estrelaPeso * estrelaBaseline) / (likes + dislikes + estrelaPeso);
+        return Math.round(proporcao * 5 * 10.0) / 10.0; // 1 casa decimal
+    }
+
     public DocumentarioResponse toResponse(Documentario doc) {
         String urlStreaming = BASE_URL + "/api/streaming/" + doc.getId();
         String urlDownload = BASE_URL + "/api/documentarios/" + doc.getId() + "/download";
@@ -293,6 +309,9 @@ public class DocumentarioService {
         String urlLegendas = fileStorageUtil.existe(doc.getCaminhoLegendas())
                 ? BASE_URL + "/api/streaming/" + doc.getId() + "/legendas"
                 : null;
+
+        long likes = avaliacaoRepository.countLikesByDocumentarioId(doc.getId());
+        long dislikes = avaliacaoRepository.countDislikesByDocumentarioId(doc.getId());
 
         return DocumentarioResponse.builder()
                 .id(doc.getId())
@@ -310,7 +329,9 @@ public class DocumentarioService {
                 .urlDownload(urlDownload)
                 .urlThumbnail(urlThumbnail)
                 .urlLegendas(urlLegendas)
-                .likeCount(avaliacaoRepository.countLikesByDocumentarioId(doc.getId()))
+                .likeCount(likes)
+                .mediaEstrelas(calcularMediaEstrelas(likes, dislikes))
+                .totalAvaliacoes(likes + dislikes)
                 .tamanhoOriginalBytes(doc.getTamanhoOriginalBytes())
                 .tamanhoComprimidoBytes(doc.getTamanhoComprimidoBytes())
                 .taxaCompressao(doc.getTaxaCompressao())

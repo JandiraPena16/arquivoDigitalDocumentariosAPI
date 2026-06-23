@@ -94,15 +94,17 @@ public class FFmpegUtil {
     }
 
     /**
-     * Extrai thumbnail do segundo 10 do vídeo.
+     * Extrai um thumbnail representativo do vídeo.
+     * Usa o filtro "thumbnail" do FFmpeg, que escolhe automaticamente um bom
+     * fotograma — funciona para vídeos de QUALQUER duração (inclusive < 10s),
+     * ao contrário de saltar para um instante fixo que falha em vídeos curtos.
      */
     public void extrairThumbnail(String entrada, String saida) {
         List<String> cmd = List.of(
                 ffmpegPath,
                 "-i", entrada,
-                "-ss", "00:00:10",
+                "-vf", "thumbnail,scale=320:-1",
                 "-frames:v", "1",
-                "-vf", "scale=320:-1",
                 "-y",
                 saida
         );

@@ -13,6 +13,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.LocalDateTime;
@@ -90,6 +91,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErroResponse> handleMaxUpload(MaxUploadSizeExceededException ex, HttpServletRequest req) {
         return build(HttpStatus.PAYLOAD_TOO_LARGE, "Ficheiro demasiado grande", "O tamanho máximo permitido é 2GB", req.getRequestURI());
+    }
+
+    /**
+     * Cliente (ex.: ExoPlayer) fechou a ligação a meio do streaming de vídeo.
+     * É normal e a resposta já foi enviada — apenas ignoramos, sem poluir os logs.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientAbort(AsyncRequestNotUsableException ex) {
+        log.debug("Cliente fechou a ligação durante o streaming (normal): {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

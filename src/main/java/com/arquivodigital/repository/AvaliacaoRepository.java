@@ -19,4 +19,7 @@ public interface AvaliacaoRepository extends JpaRepository<Avaliacao, Long> {
 
     @Query("SELECT COUNT(a) FROM Avaliacao a WHERE a.documentario.id = :docId AND a.valor = 1")
     long countLikesByDocumentarioId(@Param("docId") Long docId);
+
+    @Query("SELECT COUNT(a) FROM Avaliacao a WHERE a.documentario.id = :docId AND a.valor = -1")
+    long countDislikesByDocumentarioId(@Param("docId") Long docId);
 }

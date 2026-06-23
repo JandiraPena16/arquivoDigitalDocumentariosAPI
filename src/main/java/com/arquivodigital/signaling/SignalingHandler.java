@@ -120,8 +120,8 @@ public class SignalingHandler extends TextWebSocketHandler {
         // Envia as contagens de reações actuais ao novo espectador
         ObjectNode counts = mapper.createObjectNode();
         counts.put("type", "reaction");
-        counts.put("likes", live.getLikes().get());
-        counts.put("dislikes", live.getDislikes().get());
+        counts.put("likes", live.getLikes());
+        counts.put("dislikes", live.getDislikes());
         enviar(session, counts);
 
         // Notifica o emissor para criar a ligação P2P com este espectador
@@ -164,20 +164,24 @@ public class SignalingHandler extends TextWebSocketHandler {
         difundir(live, out);
     }
 
-    /** Reação (like/dislike) — actualiza o total e difunde a todos. */
+    /**
+     * Reação (like/dislike) — uma por utilizador, com toggle.
+     * Clicar de novo na mesma reação anula; clicar na oposta troca o voto.
+     */
     private void aoReacao(WebSocketSession session, JsonNode msg) {
         String tipo = texto(msg, "tipo");
         LiveSession live = liveDaSessao(session);
-        if (live == null || tipo == null) return;
+        if (live == null || (!"like".equals(tipo) && !"dislike".equals(tipo))) return;
 
-        if ("like".equals(tipo)) live.getLikes().incrementAndGet();
-        else if ("dislike".equals(tipo)) live.getDislikes().incrementAndGet();
-        else return;
+        Long userId = (Long) session.getAttributes().get(JwtHandshakeInterceptor.ATTR_USER_ID);
+        if (userId == null) return;
+
+        live.aplicarReacao(userId, tipo);
 
         ObjectNode out = mapper.createObjectNode();
         out.put("type", "reaction");
-        out.put("likes", live.getLikes().get());
-        out.put("dislikes", live.getDislikes().get());
+        out.put("likes", live.getLikes());
+        out.put("dislikes", live.getDislikes());
         difundir(live, out);
     }
 
