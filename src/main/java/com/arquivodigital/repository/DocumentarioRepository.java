@@ -16,7 +16,11 @@ public interface DocumentarioRepository extends JpaRepository<Documentario, Long
 
     Page<Documentario> findByStatus(StatusDocumentario status, Pageable pageable);
 
+    List<Documentario> findByStatus(StatusDocumentario status);
+
     Page<Documentario> findByCategoriaId(Long categoriaId, Pageable pageable);
+
+    Page<Documentario> findByCategoriaIdAndStatus(Long categoriaId, StatusDocumentario status, Pageable pageable);
 
     Page<Documentario> findByUtilizador(Utilizador utilizador, Pageable pageable);
 

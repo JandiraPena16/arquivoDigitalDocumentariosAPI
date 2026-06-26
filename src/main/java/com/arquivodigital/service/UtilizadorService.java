@@ -75,9 +75,49 @@ public class UtilizadorService {
         if (request.getNome() != null) utilizador.setNome(request.getNome());
         if (request.getRole() != null) utilizador.setRole(request.getRole());
         if (request.getAtivo() != null) utilizador.setAtivo(request.getAtivo());
+        if (request.getEmail() != null && !request.getEmail().isBlank()
+                && !request.getEmail().equalsIgnoreCase(utilizador.getEmail())) {
+            if (utilizadorRepository.existsByEmail(request.getEmail())) {
+                throw new NegocioException("Já existe um utilizador com esse email");
+            }
+            utilizador.setEmail(request.getEmail());
+        }
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            utilizador.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
         Utilizador salvo = utilizadorRepository.save(utilizador);
-        logService.registar(AcaoLog.ADMIN_UPDATE_USER, "Admin actualizou utilizador ID " + id, admin, ip);
+        logService.registar(AcaoLog.ADMIN_UPDATE_USER, "Admin actualizou utilizador: " + salvo.getEmail(), admin, ip);
         return utilizadorMapper.toResponse(salvo);
+    }
+
+    @Transactional
+    public UtilizadorResponse criarPorAdmin(com.arquivodigital.dto.request.AdminCreateUserRequest request, Utilizador admin, String ip) {
+        if (utilizadorRepository.existsByEmail(request.getEmail())) {
+            throw new NegocioException("Já existe um utilizador com esse email");
+        }
+        Utilizador novo = Utilizador.builder()
+                .nome(request.getNome())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(request.getRole() != null ? request.getRole() : com.arquivodigital.entity.Role.USER)
+                .ativo(true)
+                .build();
+        Utilizador salvo = utilizadorRepository.save(novo);
+        logService.registar(AcaoLog.ADMIN_UPDATE_USER,
+                "Admin criou utilizador: " + salvo.getEmail() + " (" + salvo.getRole() + ")", admin, ip);
+        return utilizadorMapper.toResponse(salvo);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<com.arquivodigital.dto.response.SessaoResponse> listarSessoes(Long id) {
+        return sessaoService.listarSessoesDo(buscarEntidade(id));
+    }
+
+    @Transactional
+    public void revogarSessoes(Long id, Utilizador admin, String ip) {
+        Utilizador u = buscarEntidade(id);
+        sessaoService.revogarTodasDoUtilizador(u);
+        logService.registar(AcaoLog.SESSAO_REVOGADA, "Admin revogou as sessões de: " + u.getEmail(), admin, ip);
     }
 
     @Transactional

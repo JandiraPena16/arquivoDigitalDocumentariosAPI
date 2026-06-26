@@ -1,32 +1,25 @@
 package com.arquivodigital.dto.request;
 
 import com.arquivodigital.entity.Role;
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-@Schema(description = "Dados para actualização de utilizador pelo administrador")
-public class AdminUpdateUserRequest {
+public class AdminCreateUserRequest {
 
     @NotBlank(message = "Nome é obrigatório")
     @Size(min = 2, max = 100)
-    @Schema(example = "Nome Actualizado")
     private String nome;
 
+    @NotBlank(message = "Email é obrigatório")
     @Email(message = "Email inválido")
-    @Schema(example = "novo@exemplo.com", description = "Opcional — só se for alterar o email")
     private String email;
 
+    @NotBlank(message = "Password é obrigatória")
     @Size(min = 6, message = "A password deve ter pelo menos 6 caracteres")
-    @Schema(description = "Opcional — só se for alterar a password")
     private String password;
 
-    @Schema(example = "USER")
-    private Role role;
-
-    @Schema(example = "true")
-    private Boolean ativo;
+    private Role role;   // USER (default) ou ADMIN
 }

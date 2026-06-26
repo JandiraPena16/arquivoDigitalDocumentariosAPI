@@ -37,6 +37,7 @@ public class DocumentarioService {
     private final CategoriaService categoriaService;
     private final CompressaoService compressaoService;
     private final LogService logService;
+    private final NotificacaoService notificacaoService;
 
     @Value("${arquivo.server.base-url:http://localhost:8080}")
     private String BASE_URL;
@@ -89,6 +90,43 @@ public class DocumentarioService {
     }
 
     @Transactional(readOnly = true)
+    public com.arquivodigital.dto.response.EstatisticasResponse estatisticas() {
+        List<Documentario> all = documentarioRepository.findAll();
+        long origTotal = 0, compTotal = 0;
+        java.util.Map<String, Long> porEstado = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> porCategoria = new java.util.LinkedHashMap<>();
+        for (Documentario d : all) {
+            porEstado.merge(d.getStatus().name(), 1L, Long::sum);
+            String cat = d.getCategoria() != null ? d.getCategoria().getNome() : "Sem categoria";
+            porCategoria.merge(cat, 1L, Long::sum);
+            if (d.getTamanhoOriginalBytes() != null && d.getTamanhoComprimidoBytes() != null) {
+                origTotal += d.getTamanhoOriginalBytes();
+                compTotal += d.getTamanhoComprimidoBytes();
+            }
+        }
+        long poupado = origTotal - compTotal;
+        double taxa = origTotal > 0 ? (1.0 - (double) compTotal / origTotal) * 100 : 0;
+        return com.arquivodigital.dto.response.EstatisticasResponse.builder()
+                .totalDocumentarios(all.size())
+                .totalOriginalLegivel(FileStorageUtil.formatarBytes(origTotal))
+                .totalComprimidoLegivel(FileStorageUtil.formatarBytes(compTotal))
+                .totalPoupadoLegivel(FileStorageUtil.formatarBytes(Math.max(0, poupado)))
+                .totalPoupadoBytes(poupado)
+                .taxaMediaCompressao(String.format("%.1f%%", taxa))
+                .porEstado(porEstado)
+                .porCategoria(porCategoria)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<DocumentarioResponse> listarTodosAdmin(int pagina, int tamanho) {
+        // Admin vê TODOS os documentários, independentemente do estado
+        Page<Documentario> page = documentarioRepository.findAll(
+                PageRequest.of(pagina, tamanho, Sort.by("dataCriacao").descending()));
+        return toPageResponse(page);
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<DocumentarioResponse> listar(int pagina, int tamanho) {
         Page<Documentario> page = documentarioRepository.findByStatus(
                 StatusDocumentario.PRONTO,
@@ -108,8 +146,9 @@ public class DocumentarioService {
 
     @Transactional(readOnly = true)
     public PageResponse<DocumentarioResponse> listarPorCategoria(Long categoriaId, int pagina, int tamanho) {
-        Page<Documentario> page = documentarioRepository.findByCategoriaId(
-                categoriaId,
+        // Só documentários PRONTOS aparecem nas listagens públicas
+        Page<Documentario> page = documentarioRepository.findByCategoriaIdAndStatus(
+                categoriaId, StatusDocumentario.PRONTO,
                 PageRequest.of(pagina, tamanho, Sort.by("dataCriacao").descending())
         );
         return toPageResponse(page);
@@ -142,7 +181,9 @@ public class DocumentarioService {
             doc.setCategoria(categoriaService.buscarEntidade(request.getCategoriaId()));
         }
 
-        return toResponse(documentarioRepository.save(doc));
+        DocumentarioResponse resp = toResponse(documentarioRepository.save(doc));
+        logService.registar(AcaoLog.UPDATE_DOCUMENTARIO, "Editou o documentário: " + doc.getTitulo(), utilizador, null);
+        return resp;
     }
 
     @Transactional
@@ -177,12 +218,22 @@ public class DocumentarioService {
         documentarioRepository.incrementarDownloads(id);
         Documentario doc = buscarEntidade(id);
         logService.registar(AcaoLog.DOWNLOAD, "Download: " + doc.getTitulo(), utilizador, ip);
+        // Notifica o dono do vídeo (exceto se for ele próprio a descarregar)
+        notificacaoService.notificarDownloadRecebido(doc, utilizador);
     }
 
     @Transactional(readOnly = true)
     public List<DocumentarioResponse> listarMaisVistos() {
-        return documentarioRepository.findTop10ByStatusOrderByVisualizacoesDesc(StatusDocumentario.PRONTO)
-                .stream().map(this::toResponse).toList();
+        // Top 10 — classificação por: mais estrelas → desempate por mais visualizações
+        // → desempate por publicado primeiro (data de criação mais antiga à frente).
+        return documentarioRepository.findByStatus(StatusDocumentario.PRONTO).stream()
+                .map(this::toResponse)
+                .sorted(java.util.Comparator
+                        .comparingDouble((DocumentarioResponse r) -> r.getMediaEstrelas() != null ? r.getMediaEstrelas() : 0.0).reversed()
+                        .thenComparing(java.util.Comparator.comparingLong((DocumentarioResponse r) -> r.getVisualizacoes() != null ? r.getVisualizacoes() : 0L).reversed())
+                        .thenComparing(r -> r.getDataCriacao(), java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .limit(10)
+                .toList();
     }
 
     @Transactional

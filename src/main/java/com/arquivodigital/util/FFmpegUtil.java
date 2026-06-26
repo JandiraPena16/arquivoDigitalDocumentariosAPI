@@ -59,6 +59,7 @@ public class FFmpegUtil {
      * Comprime vídeo com H.265 (libx265).
      */
     public long comprimirVideoH265(String entrada, String saida) {
+        // CRF 28 em H.265 ≈ qualidade de CRF 23 em H.264, mas ~40% mais pequeno.
         List<String> cmd = List.of(
                 ffmpegPath,
                 "-i", entrada,
@@ -68,6 +69,7 @@ public class FFmpegUtil {
                 "-c:a", "aac",
                 "-b:a", "128k",
                 "-tag:v", "hvc1",
+                "-movflags", "+faststart",
                 "-y",
                 saida
         );

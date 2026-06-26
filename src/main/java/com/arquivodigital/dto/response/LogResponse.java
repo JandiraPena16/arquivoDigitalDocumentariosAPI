@@ -17,5 +17,6 @@ public class LogResponse {
     private String nomeUtilizador;
     private Long utilizadorId;
     private String ip;
+    private String dispositivo;
     private LocalDateTime timestamp;
 }

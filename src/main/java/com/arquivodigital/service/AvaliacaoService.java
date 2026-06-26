@@ -20,6 +20,7 @@ public class AvaliacaoService {
 
     private final AvaliacaoRepository avaliacaoRepository;
     private final DocumentarioRepository documentarioRepository;
+    private final NotificacaoService notificacaoService;
 
     @Transactional(readOnly = true)
     public AvaliacaoResponse obter(Long docId, Utilizador utilizador) {
@@ -39,6 +40,10 @@ public class AvaliacaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Documentário não encontrado: " + docId));
 
         Optional<Avaliacao> existente = avaliacaoRepository.findByUtilizadorAndDocumentario(utilizador, doc);
+        // É um like NOVO (para notificar o dono apenas uma vez por mudança)
+        boolean novoLike = request.getValor() != null && request.getValor() == 1
+                && (existente.isEmpty() || existente.get().getValor() == null || existente.get().getValor() != 1);
+
         if (existente.isPresent()) {
             existente.get().setValor(request.getValor());
             avaliacaoRepository.save(existente.get());
@@ -49,6 +54,12 @@ public class AvaliacaoService {
                     .valor(request.getValor())
                     .build());
         }
+
+        if (novoLike) {
+            try { notificacaoService.notificarLikeRecebido(doc, utilizador); }
+            catch (Exception ignored) {}
+        }
+
         return AvaliacaoResponse.builder()
                 .documentarioId(docId)
                 .valor(request.getValor())

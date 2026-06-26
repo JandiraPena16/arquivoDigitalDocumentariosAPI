@@ -42,6 +42,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Swagger
                         .requestMatchers(SWAGGER_WHITELIST).permitAll()
+                        // Backoffice web (ficheiros estáticos) — a autenticação é via API com JWT
+                        .requestMatchers("/admin/**", "/", "/index.html", "/favicon.ico").permitAll()
                         // Auth público
                         .requestMatchers("/api/auth/login", "/api/auth/registar").permitAll()
                         // Sinalização WebSocket (JWT validado no handshake via query param)

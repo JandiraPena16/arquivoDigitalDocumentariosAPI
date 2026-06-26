@@ -25,6 +25,7 @@ public class CompressaoService {
     private final FileStorageUtil fileStorageUtil;
     private final DocumentarioRepository documentarioRepository;
     private final LogService logService;
+    private final NotificacaoService notificacaoService;
 
     @Async("compressaoExecutor")
     @Transactional
@@ -41,8 +42,8 @@ public class CompressaoService {
 
             long tamanhoOriginal = fileStorageUtil.tamanhoFicheiro(doc.getCaminhoOriginal());
 
-            // Compressão com H.264
-            long tempoMs = ffmpegUtil.comprimirVideo(doc.getCaminhoOriginal(), caminhoComprimido);
+            // Compressão com H.265 (maior taxa de compressão, mesma qualidade percebida)
+            long tempoMs = ffmpegUtil.comprimirVideoH265(doc.getCaminhoOriginal(), caminhoComprimido);
 
             // Thumbnail
             try {
@@ -65,7 +66,7 @@ public class CompressaoService {
             doc.setTamanhoComprimidoBytes(tamanhoComprimido);
             doc.setTaxaCompressao(taxa);
             doc.setTempoProcessamentoMs(tempoMs);
-            doc.setCodecVideo("H.264 (libx264)");
+            doc.setCodecVideo("H.265 (libx265)");
             doc.setCodecAudio("AAC");
             doc.setFormato("MP4");
             if (duracao != null) doc.setDuracaoSegundos(duracao);
@@ -86,8 +87,16 @@ public class CompressaoService {
 
             if (doc.getUtilizador() != null) {
                 logService.registar(AcaoLog.COMPRESSAO,
-                        String.format("Compressao H.264 concluida: %.1f%% reducao, %dms", taxa, tempoMs),
+                        String.format("Compressao concluida: %.1f%% reducao, %dms", taxa, tempoMs),
                         doc.getUtilizador(), null);
+            }
+
+            // Notificações: upload pronto (dono) + novo vídeo (quem gosta da categoria)
+            try {
+                notificacaoService.notificarUploadConcluido(doc);
+                notificacaoService.notificarNovoVideoNaCategoria(doc);
+            } catch (Exception e) {
+                log.warn("Falha ao criar notificações para doc {}: {}", documentarioId, e.getMessage());
             }
 
         } catch (Exception e) {

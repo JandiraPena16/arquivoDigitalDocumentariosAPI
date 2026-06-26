@@ -91,6 +91,25 @@ public class DocumentarioController {
         return ResponseEntity.ok(documentarioService.listarMeus(utilizador, pagina, tamanho));
     }
 
+    @GetMapping("/admin/todos")
+    @Operation(summary = "Listar TODOS os documentários, qualquer estado (apenas ADMIN)",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PageResponse<DocumentarioResponse>> listarTodosAdmin(
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamanho
+    ) {
+        return ResponseEntity.ok(documentarioService.listarTodosAdmin(pagina, tamanho));
+    }
+
+    @GetMapping("/admin/estatisticas")
+    @Operation(summary = "Estatísticas globais: compressão poupada, por estado e por categoria (apenas ADMIN)",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.arquivodigital.dto.response.EstatisticasResponse> estatisticas() {
+        return ResponseEntity.ok(documentarioService.estatisticas());
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Buscar documentário por ID (público)")
     public ResponseEntity<DocumentarioResponse> buscar(@PathVariable Long id) {

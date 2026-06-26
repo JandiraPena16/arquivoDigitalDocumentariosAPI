@@ -1,0 +1,9 @@
+# NUNCA commitar chaves privadas nem keystores!
+ca/
+server/
+devices/
+*.key
+*.p12
+*.csr
+*.srl
+# (os scripts .sh e este .gitignore são versionados; os certificados gerados NÃO)

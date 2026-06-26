@@ -28,6 +28,9 @@ public class Log {
 
     private String userAgent;
 
+    /** CN do certificado de cliente (mTLS) que originou a ação — rastreabilidade por dispositivo. */
+    private String dispositivo;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime timestamp;
 

@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SignalingHandler extends TextWebSocketHandler {
 
     private final LiveRegistry registry;
+    private final com.arquivodigital.service.NotificacaoService notificacaoService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     /** sessionId -> sessão WebSocket activa. */
@@ -100,6 +101,13 @@ public class SignalingHandler extends TextWebSocketHandler {
         resp.put("selfId", session.getId());
         enviar(session, resp);
         log.info("Live iniciada {} por user {} ({})", liveId, userId, nome);
+
+        // Notificar os outros utilizadores de que começou uma live
+        try {
+            notificacaoService.notificarLive(userId, nome, liveId, titulo);
+        } catch (Exception e) {
+            log.warn("Falha ao notificar live {}: {}", liveId, e.getMessage());
+        }
     }
 
     private void aoEntrar(WebSocketSession session, JsonNode msg) {

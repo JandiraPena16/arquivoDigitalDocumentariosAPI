@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arquivo Digital — Backoffice</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login-view" class="login-wrap">
+    <button class="theme-fab theme-toggle" title="Alternar tema claro/escuro"><span class="ic" data-icon="sun"></span></button>
+    <div class="login-aside">
+        <div class="login-mark"><span class="ic" data-icon="film"></span></div>
+        <h1>Arquivo Digital<br>de Documentários</h1>
+        <p>Painel de administração da plataforma. Gere utilizadores, conteúdos, categorias e monitoriza a atividade do sistema.</p>
+        <ul class="login-feats">
+            <li><span class="ic" data-icon="users"></span> Gestão de utilizadores e permissões</li>
+            <li><span class="ic" data-icon="film"></span> Moderação de documentários</li>
+            <li><span class="ic" data-icon="activity"></span> Estatísticas e registos de atividade</li>
+        </ul>
+    </div>
+    <div class="login-panel">
+        <div class="login-box">
+            <h2>Iniciar sessão</h2>
+            <p class="login-sub">Acesso exclusivo a administradores</p>
+            <form id="login-form">
+                <label>Email</label>
+                <div class="input-ic"><span class="ic" data-icon="user"></span><input type="email" id="login-email" placeholder="admin@exemplo.com" required></div>
+                <label>Palavra-passe</label>
+                <div class="input-ic"><span class="ic" data-icon="lock"></span><input type="password" id="login-password" placeholder="••••••••" required></div>
+                <button type="submit" class="btn btn-primary btn-block" id="login-btn">Entrar</button>
+                <div id="login-error" class="alert alert-error" style="display:none"></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app-view" style="display:none">
+    <aside class="sidebar">
+        <div class="brand"><span class="brand-mark ic" data-icon="film"></span> <span>Backoffice</span></div>
+        <nav>
+            <a class="nav-item active" data-section="dashboard"><span class="ic" data-icon="dashboard"></span> Dashboard</a>
+            <a class="nav-item" data-section="users"><span class="ic" data-icon="users"></span> Utilizadores</a>
+            <a class="nav-item" data-section="docs"><span class="ic" data-icon="film"></span> Documentários</a>
+            <a class="nav-item" data-section="lives"><span class="ic" data-icon="radio"></span> Lives</a>
+            <a class="nav-item" data-section="categories"><span class="ic" data-icon="tag"></span> Categorias</a>
+            <a class="nav-item" data-section="certs"><span class="ic" data-icon="shield"></span> Certificados</a>
+            <a class="nav-item" data-section="logs"><span class="ic" data-icon="file"></span> Logs</a>
+        </nav>
+        <div class="sidebar-foot">
+            <button class="me" id="profile-btn" title="Editar o meu perfil">
+                <div class="me-avatar" id="me-avatar">A</div>
+                <div class="me-info">
+                    <div class="me-name" id="me-name">Admin</div>
+                    <div class="me-role">Administrador</div>
+                </div>
+                <span class="ic me-gear" data-icon="settings"></span>
+            </button>
+            <button class="btn btn-ghost btn-block" id="logout-btn"><span class="ic" data-icon="logout"></span> Terminar sessão</button>
+        </div>
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <h2 id="section-title">Dashboard</h2>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-ghost btn-icon theme-toggle" title="Alternar tema claro/escuro"><span class="ic" data-icon="sun"></span></button>
+                <button class="btn btn-ghost" id="refresh-btn"><span class="ic" data-icon="refresh"></span> Atualizar</button>
+            </div>
+        </header>
+
+        <!-- Dashboard -->
+        <section id="section-dashboard" class="section">
+            <div class="stats-grid" id="stats-grid"></div>
+            <div id="dash-extra"></div>
+            <div class="card">
+                <h3>Top 10 — Classificação (mais estrelas)</h3>
+                <div id="topvistos"></div>
+            </div>
+        </section>
+
+        <!-- Utilizadores -->
+        <section id="section-users" class="section" style="display:none">
+            <div class="card">
+                <div class="toolbar">
+                    <div class="input-ic grow"><span class="ic" data-icon="search"></span><input id="users-search" placeholder="Procurar por nome ou email..."></div>
+                    <button class="btn btn-primary" id="new-user-btn"><span class="ic" data-icon="plus"></span> Novo utilizador</button>
+                </div>
+                <div class="table-wrap"><table id="users-table"></table></div>
+                <div class="pager" id="users-pager"></div>
+            </div>
+        </section>
+
+        <!-- Documentários -->
+        <section id="section-docs" class="section" style="display:none">
+            <div class="card">
+                <div class="toolbar">
+                    <div class="input-ic grow"><span class="ic" data-icon="search"></span><input id="docs-search" placeholder="Procurar por título..."></div>
+                    <select id="docs-filter">
+                        <option value="">Todos os estados</option>
+                        <option value="PRONTO">Pronto</option>
+                        <option value="PROCESSANDO">Processando</option>
+                        <option value="PENDENTE">Pendente</option>
+                        <option value="ERRO">Erro</option>
+                    </select>
+                    <button class="btn btn-primary" id="upload-btn"><span class="ic" data-icon="upload"></span> Carregar</button>
+                </div>
+                <div class="table-wrap"><table id="docs-table"></table></div>
+                <div class="pager" id="docs-pager"></div>
+            </div>
+        </section>
+
+        <!-- Lives -->
+        <section id="section-lives" class="section" style="display:none">
+            <div class="card"><div class="table-wrap"><table id="lives-table"></table></div></div>
+        </section>
+
+        <!-- Categorias -->
+        <section id="section-categories" class="section" style="display:none">
+            <div class="card">
+                <div class="toolbar"><div class="grow"></div>
+                    <button class="btn btn-primary" id="new-cat-btn"><span class="ic" data-icon="plus"></span> Nova categoria</button>
+                </div>
+                <div class="table-wrap"><table id="cats-table"></table></div>
+            </div>
+        </section>
+
+        <!-- Logs -->
+        <section id="section-logs" class="section" style="display:none">
+            <div class="card">
+                <div class="toolbar">
+                    <div class="input-ic grow"><span class="ic" data-icon="search"></span><input id="logs-search" placeholder="Procurar por utilizador, ação ou detalhe..."></div>
+                    <button class="btn btn-danger" id="clear-logs-btn"><span class="ic" data-icon="trash"></span> Limpar logs</button>
+                </div>
+                <div class="table-wrap"><table id="logs-table"></table></div>
+                <div class="pager" id="logs-pager"></div>
+            </div>
+        </section>
+
+        <!-- Certificados (PKI / mTLS) -->
+        <section id="section-certs" class="section" style="display:none">
+            <div class="card">
+                <div class="toolbar">
+                    <div class="grow" style="color:var(--muted);font-size:13px">Dispositivos com certificado emitido pela CA. A revogação bloqueia o acesso do dispositivo.</div>
+                    <button class="btn btn-ghost" id="download-ca-btn"><span class="ic" data-icon="shield"></span> Descarregar CA</button>
+                    <button class="btn btn-primary" id="new-cert-btn"><span class="ic" data-icon="plus"></span> Registar</button>
+                </div>
+                <div class="table-wrap"><table id="certs-table"></table></div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div id="modal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+        <div class="modal-head">
+            <h3 id="modal-title">Título</h3>
+            <button class="modal-close" id="modal-close"><span class="ic" data-icon="x"></span></button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

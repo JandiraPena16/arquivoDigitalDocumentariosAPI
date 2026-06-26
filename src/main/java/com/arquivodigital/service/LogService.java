@@ -28,6 +28,7 @@ public class LogService {
                 .detalhe(detalhe)
                 .utilizador(utilizador)
                 .ip(ip)
+                .dispositivo(com.arquivodigital.security.DispositivoContext.get())
                 .build();
         logRepository.save(log);
     }

@@ -29,6 +29,7 @@ import java.util.Map;
 public class UtilizadorController {
 
     private final UtilizadorService utilizadorService;
+    private final com.arquivodigital.service.AtividadeService atividadeService;
 
     @GetMapping
     @Operation(summary = "Listar todos os utilizadores (apenas ADMIN)")
@@ -38,6 +39,39 @@ public class UtilizadorController {
             @RequestParam(defaultValue = "10") int tamanho
     ) {
         return ResponseEntity.ok(utilizadorService.listarTodos(pagina, tamanho));
+    }
+
+    @PostMapping
+    @Operation(summary = "Criar utilizador/admin (apenas ADMIN)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UtilizadorResponse> criar(
+            @Valid @RequestBody com.arquivodigital.dto.request.AdminCreateUserRequest request,
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            HttpServletRequest httpRequest
+    ) {
+        Utilizador admin = utilizadorService.buscarEntidade(principal.getId());
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(utilizadorService.criarPorAdmin(request, admin, httpRequest.getRemoteAddr()));
+    }
+
+    @GetMapping("/{id}/sessoes")
+    @Operation(summary = "Listar as sessões de um utilizador (apenas ADMIN)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<com.arquivodigital.dto.response.SessaoResponse>> sessoes(@PathVariable Long id) {
+        return ResponseEntity.ok(utilizadorService.listarSessoes(id));
+    }
+
+    @DeleteMapping("/{id}/sessoes")
+    @Operation(summary = "Revogar todas as sessões de um utilizador (apenas ADMIN)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> revogarSessoes(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            HttpServletRequest httpRequest
+    ) {
+        Utilizador admin = utilizadorService.buscarEntidade(principal.getId());
+        utilizadorService.revogarSessoes(id, admin, httpRequest.getRemoteAddr());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/perfil")
@@ -76,6 +110,13 @@ public class UtilizadorController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UtilizadorResponse> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(utilizadorService.buscarPorId(id));
+    }
+
+    @GetMapping("/{id}/atividade")
+    @Operation(summary = "Atividade de um utilizador: likes/dislikes, lista e histórico (apenas ADMIN)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.arquivodigital.dto.response.UtilizadorAtividadeResponse> atividade(@PathVariable Long id) {
+        return ResponseEntity.ok(atividadeService.atividade(id));
     }
 
     @PutMapping("/{id}")
