@@ -15,6 +15,8 @@ Backend REST em Spring Boot para a plataforma de arquivo digital de documentári
 6. [Guia de Testes por Funcionalidade](#6-guia-de-testes-por-funcionalidade)
 7. [Estrutura da API](#7-estrutura-da-api)
 8. [Credenciais Padrão](#8-credenciais-padrão)
+9. [Painel de Administração (Backoffice Web)](#9-painel-de-administração-backoffice-web)
+10. [Segurança PKI / mTLS e Enrollment](#10-segurança-pki--mtls-e-enrollment)
 
 ---
 
@@ -408,9 +410,21 @@ arquivoDigitalDocumentariosAPI/
     │   └── handler/     → GlobalExceptionHandler
     ├── mapper/          → MapStruct mappers (Entity ↔ DTO)
     ├── repository/      → JPA repositories
-    ├── security/        → JwtUtil, JwtFilter, SecurityConfig, UserDetailsImpl
-    ├── service/         → AuthService, DocumentarioService, StreamingService...
+    ├── security/        → JwtUtil, JwtFilter, SecurityConfig, ClientCertFilter, DispositivoContext
+    ├── service/         → AuthService, DocumentarioService, CertificadoService, EnrollmentService...
     └── util/            → FFmpegUtil, FileStorageUtil
+
+src/main/resources/
+├── static/admin/       → Painel de administração web (index.html, app.js, style.css)
+└── application.properties
+
+pki/                    → Autoridade Certificadora + scripts mTLS (NÃO versionar as chaves)
+├── gerar_pki.sh        → cria CA + certificado do servidor + truststore
+├── emitir_dispositivo.sh
+├── testar.sh
+├── ca/                 → ca.crt, ca.key  (chave privada da CA — secreta)
+├── server/             → server-keystore.p12, truststore.p12
+└── devices/            → certificados emitidos por dispositivo
 ```
 
 ---
@@ -431,3 +445,87 @@ arquivoDigitalDocumentariosAPI/
 - **Thumbnail**: JPEG 320px extraído ao segundo 10
 - **Processamento assíncrono** — o upload responde imediatamente, a compressão corre em background
 - **Relatório comparativo** disponível em `/api/documentarios/{id}/relatorio-compressao`
+
+---
+
+## 9. Painel de Administração (Backoffice Web)
+
+O backend serve um **painel web de administração** (HTML/CSS/JS puro, sem framework) a partir de `src/main/resources/static/admin/`.
+
+**Acesso:**
+```
+https://<ip-ou-localhost>:8080/admin/index.html
+```
+- Login **exclusivo a administradores** (um utilizador `USER` recebe "sem autorização").
+- Tema claro/escuro, ícones SVG profissionais.
+
+**Funcionalidades:** Dashboard com estatísticas e gráficos de compressão; gestão de utilizadores (criar, editar nome/email/password, ativar, eliminar, ver atividade e sessões); gestão e **upload** de documentários (reprocessar, relatório, assistir, eliminar); categorias; lives em direto; **certificados** (PKI); logs de auditoria com a coluna **Dispositivo**.
+
+> Como o backend agora corre em **HTTPS** (ver secção 10), o painel abre em `https://`. Com a CA privada, o browser mostra um aviso — instala o `pki/ca/ca.crt` nas raízes de confiança para abrir sem aviso.
+
+---
+
+## 10. Segurança PKI / mTLS e Enrollment
+
+O backend implementa uma **PKI completa com TLS mútuo (mTLS)** para encriptar a comunicação (anti-MITM), **identificar cada dispositivo** por certificado e garantir **rastreabilidade**.
+
+### Componentes (pasta `pki/`)
+
+| Ficheiro | Função |
+|---|---|
+| `gerar_pki.sh` | Cria a **CA** (`ca/ca.crt` + `ca/ca.key`), o **certificado do servidor** (com SAN do IP) e o **truststore** |
+| `emitir_dispositivo.sh <id> [dono]` | Emite manualmente um certificado de cliente para um dispositivo |
+| `testar.sh` | Testa o mTLS ponta-a-ponta (openssl + curl) |
+| `.gitignore` | Protege as **chaves privadas** (`*.key`, `*.p12`) de irem para o Git |
+
+### Gerar a PKI (uma vez)
+
+```bash
+cd pki
+SERVER_IP=192.168.100.171 bash gerar_pki.sh
+# O truststore tem de ser criado com keytool (Java), não openssl:
+keytool -importcert -noprompt -trustcacerts -alias arquivo-ca \
+  -file ca/ca.crt -keystore server/truststore.p12 -storetype PKCS12 -storepass changeit
+```
+
+### Ativar HTTPS + mTLS (`application.properties`)
+
+```properties
+server.ssl.enabled=true
+server.ssl.key-store=./pki/server/server-keystore.p12
+server.ssl.key-store-password=changeit
+server.ssl.key-store-type=PKCS12
+server.ssl.key-alias=arquivo
+server.ssl.trust-store=./pki/server/truststore.p12
+server.ssl.trust-store-password=changeit
+server.ssl.client-auth=want          # pede o certificado; o backoffice (browser) continua a abrir
+server.ssl.enabled-protocols=TLSv1.2  # TLS 1.3 não suporta client-auth opcional
+arquivo.server.base-url=https://192.168.100.171:8080
+```
+
+> Para voltar a HTTP simples: `server.ssl.enabled=false` + `base-url=http://...`.
+
+### Enrollment automático
+
+Quando um dispositivo faz login pela 1.ª vez, a app chama `POST /api/enrollment` (deviceId + nome). O servidor:
+1. Gera (via OpenSSL) um par de chaves + certificado **assinado pela CA** para aquele dispositivo;
+2. **Regista** os metadados na tabela `certificados_dispositivo` (visível no backoffice);
+3. Devolve o **PKCS#12** (Base64 + password) que a app guarda e passa a apresentar em cada ligação.
+
+Propriedades: `arquivo.pki.dir=./pki` e `arquivo.pki.openssl-path=openssl` (ajustar se o OpenSSL não estiver no PATH do processo Java).
+
+### Rastreabilidade
+
+O `ClientCertFilter` lê o certificado do cliente em cada pedido, extrai o **CN (id do dispositivo)**, **bloqueia certificados revogados** e grava o dispositivo em cada **log** → o backoffice mostra *quem + que dispositivo + fez o quê + quando + de que IP*.
+
+### Endpoints PKI
+
+| Método | URL | Acesso | Descrição |
+|---|---|---|---|
+| POST | `/api/enrollment` | Autenticado | Enrolar dispositivo (recebe o certificado) |
+| GET | `/api/certificados` | Admin | Listar certificados de dispositivo |
+| POST | `/api/certificados` | Admin | Registar metadados de um certificado |
+| POST | `/api/certificados/{id}/revogar` | Admin | Revogar certificado |
+| GET | `/api/certificados/ca` | Admin | Descarregar o `ca.crt` |
+
+> **Nota (resolução de problemas):** ao adicionar valores a um `enum` mapeado com `@Enumerated(STRING)`, o Hibernate (`ddl-auto=update`) **não** atualiza a constraint CHECK existente. Se um `INSERT` falhar com `violates check constraint`, remove a constraint: `ALTER TABLE logs DROP CONSTRAINT logs_acao_check;`
