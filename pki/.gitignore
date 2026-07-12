@@ -1,9 +1,18 @@
-# NUNCA commitar chaves privadas nem keystores!
-ca/
-server/
-devices/
-*.key
-*.p12
-*.csr
-*.srl
-# (os scripts .sh e este .gitignore são versionados; os certificados gerados NÃO)
+# ============================================================
+#  Regras DESATIVADAS — decisão do grupo: versionar os certificados
+#  para facilitar a partilha entre os membros da equipa.
+#
+#  ⚠️ ATENÇÃO: com estas regras comentadas, a CHAVE PRIVADA DA CA (ca.key)
+#     e os keystores (.p12) VÃO para o Git. Em produção isto NUNCA se faz —
+#     quem tiver a ca.key pode forjar qualquer certificado do sistema.
+#
+#  Para voltar a proteger, basta descomentar as linhas abaixo.
+# ============================================================
+
+# ca/
+# server/
+# devices/
+# *.key
+# *.p12
+# *.csr
+# *.srl
