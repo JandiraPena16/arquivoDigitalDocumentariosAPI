@@ -1,17 +1,23 @@
 package com.arquivodigital.controller;
 
 import com.arquivodigital.dto.response.LiveResponse;
+import com.arquivodigital.entity.AcaoLog;
+import com.arquivodigital.entity.Utilizador;
 import com.arquivodigital.exception.custom.ResourceNotFoundException;
+import com.arquivodigital.security.UserDetailsImpl;
+import com.arquivodigital.service.LogService;
+import com.arquivodigital.service.UtilizadorService;
 import com.arquivodigital.signaling.LiveRegistry;
 import com.arquivodigital.signaling.LiveSession;
+import com.arquivodigital.signaling.SignalingHandler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Comparator;
 import java.util.List;
@@ -23,6 +29,9 @@ import java.util.List;
 public class LiveController {
 
     private final LiveRegistry registry;
+    private final SignalingHandler signalingHandler;
+    private final UtilizadorService utilizadorService;
+    private final LogService logService;
 
     @GetMapping
     @Operation(summary = "Listar transmissões ao vivo activas (público)")
@@ -40,6 +49,31 @@ public class LiveController {
         LiveSession live = registry.porId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Live não encontrada ou já terminada: " + id));
         return ResponseEntity.ok(toResponse(live));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "INTERROMPER uma transmissão ao vivo (apenas ADMIN)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> interromper(
+            @PathVariable String id,
+            @RequestParam(required = false) String motivo,
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            HttpServletRequest httpRequest
+    ) {
+        LiveSession live = registry.porId(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Live não encontrada ou já terminada: " + id));
+        String titulo = live.getTitulo();
+        String emissor = live.getBroadcasterNome();
+
+        signalingHandler.encerrarPorAdmin(id, motivo);
+
+        Utilizador admin = utilizadorService.buscarEntidade(principal.getId());
+        logService.registar(AcaoLog.LIVE_INTERROMPIDA,
+                "Admin interrompeu a live \"" + titulo + "\" de " + emissor
+                        + (motivo != null && !motivo.isBlank() ? " — motivo: " + motivo : ""),
+                admin, httpRequest.getRemoteAddr());
+
+        return ResponseEntity.noContent().build();
     }
 
     private LiveResponse toResponse(LiveSession s) {

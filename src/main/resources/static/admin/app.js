@@ -35,7 +35,9 @@ const SVG = {
   chevL:'<path d="M15 18l-6-6 6-6"/>',
   chevR:'<path d="M9 18l6-6-6-6"/>',
   sun:'<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>',
-  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
+  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  eye:'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/>'
 };
 function icon(n){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVG[n] || ''}</svg>`; }
 function injectIcons(root) { (root || document).querySelectorAll('[data-icon]').forEach(e => { e.innerHTML = icon(e.dataset.icon); }); }
@@ -75,11 +77,28 @@ async function api(path, method = 'GET', body) {
 let toastT;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 function openModal(title, bodyEl, wide) { $('#modal-title').textContent = title; const b = $('#modal-body'); b.innerHTML = ''; b.appendChild(bodyEl); document.querySelector('#modal .modal').classList.toggle('wide', !!wide); $('#modal').style.display = 'flex'; }
-function closeModal() { $('#modal').style.display = 'none'; $('#modal-body').innerHTML = ''; }
+function closeModal() {
+  fecharLive();   // se estava a assistir a uma live, larga o WebSocket/WebRTC
+  document.querySelector('#modal .modal').classList.remove('live-modal');
+  $('#modal').style.display = 'none';
+  $('#modal-body').innerHTML = '';
+}
 $('#modal-close').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 
 // ---------- Login ----------
+// ---------- Mostrar/ocultar palavra-passe ----------
+(function(){
+  const t = $('#login-pw-toggle'), inp = $('#login-password');
+  if (t && inp) t.onclick = () => {
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    t.querySelector('.ic').innerHTML = icon(show ? 'eyeOff' : 'eye');
+    t.setAttribute('aria-label', show ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe');
+    inp.focus();
+  };
+})();
+
 $('#login-form').onsubmit = async e => {
   e.preventDefault();
   const err = $('#login-error'); err.style.display = 'none';
@@ -501,15 +520,181 @@ async function loadLives() {
   const t = $('#lives-table'); t.innerHTML = '<tr><td class="empty">A carregar...</td></tr>';
   try {
     const lives = await api('/lives');
-    t.innerHTML = '<tr><th>Título</th><th>Transmissor</th><th>Espectadores</th><th>Iniciada</th></tr>';
-    if (!lives.length) { t.innerHTML += '<tr><td class="empty" colspan="4">Nenhuma transmissão ao vivo neste momento.</td></tr>'; return; }
+    t.innerHTML = '<tr><th>Título</th><th>Transmissor</th><th>Espectadores</th><th>Iniciada</th><th>Ações</th></tr>';
+    if (!lives.length) { t.innerHTML += '<tr><td class="empty" colspan="5">Nenhuma transmissão ao vivo neste momento.</td></tr>'; return; }
     lives.forEach(l => {
       const r = el('tr');
       r.innerHTML = `<td><span class="badge live"><span class="dot" style="background:#fca5a5"></span> AO VIVO</span> &nbsp;${esc(l.titulo)}</td>` +
         `<td>${esc(l.nomeBroadcaster || '—')}</td><td>${l.numEspectadores || 0}</td><td>${fmtDate(l.iniciadaEm)}</td>`;
-      t.appendChild(r);
+      const td = el('td'); const wrap = el('div', 'row-actions');
+      const w = el('button', 'btn btn-ghost btn-sm', 'Assistir');   w.onclick = () => watchLive(l);
+      const s = el('button', 'btn btn-danger btn-sm', 'Interromper'); s.onclick = () => stopLive(l);
+      wrap.append(w, s); td.appendChild(wrap); r.appendChild(td); t.appendChild(r);
     });
   } catch (e) { t.innerHTML = `<tr><td class="empty">${esc(e.message)}</td></tr>`; }
+}
+
+// ---------- Interromper transmissão (moderação) ----------
+function stopLive(l) {
+  const f = el('div');
+  f.innerHTML =
+    `<p style="margin-bottom:14px;line-height:1.5">Interromper a transmissão <b>"${esc(l.titulo)}"</b> de <b>${esc(l.nomeBroadcaster || '—')}</b>?<br>
+     <span style="color:var(--muted);font-size:13px">O emissor e todos os espectadores serão desligados imediatamente.</span></p>` +
+    `<label>Motivo (mostrado ao emissor e espectadores)</label>` +
+    `<input id="lv-motivo" placeholder="Ex.: conteúdo inadequado">`;
+  const btn = el('button', 'btn btn-danger btn-block', 'Interromper transmissão');
+  btn.onclick = async () => {
+    const motivo = $('#lv-motivo').value.trim();
+    try {
+      await api(`/lives/${l.id}${motivo ? '?motivo=' + encodeURIComponent(motivo) : ''}`, 'DELETE');
+      closeModal(); toast('Transmissão interrompida'); loadLives();
+    } catch (e) { toast(e.message); }
+  };
+  f.appendChild(btn); openModal('Interromper transmissão', f);
+}
+
+// ---------- Assistir à live (WebRTC no browser) ----------
+let liveWs = null, livePc = null, liveTimer = null;
+
+/** Larga a ligação da live (chamado também pelo closeModal). */
+function fecharLive() {
+  try { if (liveWs && liveWs.readyState === 1) liveWs.send(JSON.stringify({ type: 'leave' })); } catch (e) {}
+  try { if (liveWs) liveWs.close(); } catch (e) {}
+  try { if (livePc) livePc.close(); } catch (e) {}
+  liveWs = null; livePc = null;
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+}
+
+function watchLive(l) {
+  const f = el('div');
+  f.innerHTML = `
+    <div class="live-grid">
+      <div>
+        <video id="lv-video" autoplay playsinline controls
+               style="width:100%;background:#000;border-radius:10px;aspect-ratio:16/9"></video>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+          <span class="badge live"><span class="dot" style="background:#fca5a5"></span> AO VIVO</span>
+          <span id="lv-estado" style="color:var(--muted);font-size:13px">A ligar…</span>
+          <div class="grow"></div>
+          <button class="btn btn-ghost btn-sm" id="lv-like">Gosto · <b id="lv-likes">0</b></button>
+          <button class="btn btn-ghost btn-sm" id="lv-dislike">Não gosto · <b id="lv-dislikes">0</b></button>
+        </div>
+        <div style="color:var(--muted);font-size:12.5px;margin-top:8px">
+          Emissor: <b>${esc(l.nomeBroadcaster || '—')}</b> ·
+          Espectadores: <b>${l.numEspectadores || 0}</b> ·
+          Duração: <b id="lv-dur">—</b>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;min-height:280px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:7px">Chat</div>
+        <div id="lv-chat" style="flex:1;overflow:auto;max-height:300px;background:var(--panel2);
+             border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;line-height:1.5"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input id="lv-msg" placeholder="Escrever mensagem…" style="flex:1">
+          <button class="btn btn-primary btn-sm" id="lv-send">Enviar</button>
+        </div>
+      </div>
+    </div>`;
+  openModal(l.titulo, f, true);
+  document.querySelector('#modal .modal').classList.add('live-modal');
+  ligarLive(l);
+}
+
+function ligarLive(l) {
+  const video = $('#lv-video'), chat = $('#lv-chat'), estado = $('#lv-estado');
+  let broadcasterId = null;
+
+  const addMsg = (nome, texto, cor) => {
+    const d = el('div');
+    d.style.marginBottom = '6px';
+    d.innerHTML = `<b style="color:${cor || 'var(--primary)'}">${esc(nome)}:</b> ${esc(texto)}`;
+    chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+  };
+
+  // Cronómetro da duração
+  const inicio = new Date(l.iniciadaEm).getTime();
+  liveTimer = setInterval(() => {
+    const d = $('#lv-dur'); if (!d) return;
+    const s = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
+    d.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }, 1000);
+
+  // WebSocket de sinalização — MESMO protocolo que a app Android usa
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  liveWs = new WebSocket(`${proto}://${location.host}/ws/signaling?token=${encodeURIComponent(token)}`);
+
+  liveWs.onopen = () => {
+    estado.textContent = 'A entrar na transmissão…';
+    liveWs.send(JSON.stringify({ type: 'join', liveId: l.id }));
+  };
+
+  liveWs.onmessage = async (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    switch (m.type) {
+      case 'joined':
+        estado.textContent = 'À espera do vídeo…';
+        break;
+
+      case 'offer': {   // o emissor propõe a ligação P2P
+        broadcasterId = m.from;
+        livePc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        livePc.ontrack = (e) => { video.srcObject = e.streams[0]; estado.textContent = 'A transmitir'; };
+        livePc.onicecandidate = (e) => {
+          if (e.candidate && liveWs && liveWs.readyState === 1) {
+            liveWs.send(JSON.stringify({
+              type: 'ice', target: broadcasterId,
+              candidate: { sdpMid: e.candidate.sdpMid, sdpMLineIndex: e.candidate.sdpMLineIndex, candidate: e.candidate.candidate }
+            }));
+          }
+        };
+        await livePc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+        const ans = await livePc.createAnswer();
+        await livePc.setLocalDescription(ans);
+        liveWs.send(JSON.stringify({ type: 'answer', target: broadcasterId, sdp: ans.sdp }));
+        break;
+      }
+
+      case 'ice':
+        if (livePc && m.candidate) { try { await livePc.addIceCandidate(m.candidate); } catch (e) {} }
+        break;
+
+      case 'chat':
+        addMsg(m.nome || 'Anónimo', m.texto);
+        break;
+
+      case 'reaction':
+        $('#lv-likes').textContent = m.likes || 0;
+        $('#lv-dislikes').textContent = m.dislikes || 0;
+        break;
+
+      case 'live-ended':
+        estado.textContent = 'Transmissão terminada';
+        addMsg('Sistema', m.motivo || 'A transmissão terminou.', 'var(--danger)');
+        fecharLive(); loadLives();
+        break;
+
+      case 'error':
+        estado.textContent = m.mensagem || 'Erro na transmissão';
+        break;
+    }
+  };
+
+  liveWs.onerror = () => { if (estado) estado.textContent = 'Erro de ligação'; };
+  liveWs.onclose = () => { if (estado && estado.textContent !== 'Transmissão terminada') estado.textContent = 'Desligado'; };
+
+  // Chat (o admin também comenta)
+  const enviar = () => {
+    const i = $('#lv-msg'), txt = i.value.trim();
+    if (!txt || !liveWs || liveWs.readyState !== 1) return;
+    liveWs.send(JSON.stringify({ type: 'chat', texto: txt }));
+    i.value = '';
+  };
+  $('#lv-send').onclick = enviar;
+  $('#lv-msg').onkeydown = (e) => { if (e.key === 'Enter') enviar(); };
+
+  // Reações (like/dislike — uma por utilizador, com toggle no servidor)
+  $('#lv-like').onclick = () => liveWs && liveWs.readyState === 1 && liveWs.send(JSON.stringify({ type: 'reaction', tipo: 'like' }));
+  $('#lv-dislike').onclick = () => liveWs && liveWs.readyState === 1 && liveWs.send(JSON.stringify({ type: 'reaction', tipo: 'dislike' }));
 }
 async function report(d) {
   try {

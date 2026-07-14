@@ -198,3 +198,16 @@ tbody tr:hover td, table tr:hover td{ background:var(--panel2); }
 .empty{ text-align:center; color:var(--muted); padding:34px; }
 ::-webkit-scrollbar{ width:10px; height:10px; } ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:6px; }
 ::-webkit-scrollbar-track{ background:transparent; }
+
+/* ---------- Live (assistir no painel) ---------- */
+.live-grid{ display:grid; grid-template-columns:1.7fr 1fr; gap:16px; }
+@media(max-width:900px){ .live-grid{ grid-template-columns:1fr; } }
+#lv-chat:empty::after{ content:"Sem mensagens ainda."; color:var(--muted); font-size:12.5px; }
+
+/* ---------- Botao mostrar palavra-passe ---------- */
+.pw-toggle{ background:none; border:none; color:var(--muted); cursor:pointer; padding:6px;
+  display:flex; align-items:center; border-radius:7px; transition:.13s; }
+.pw-toggle:hover{ color:var(--text); background:var(--panel3); }
+.pw-toggle .ic svg{ width:18px; height:18px; }
+/* ---------- Modal de live (assistir) maior ---------- */
+.modal.live-modal{ max-width:1040px; }

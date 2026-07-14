@@ -3,6 +3,10 @@
 **Grupo 06 | Projecto Final Multimédia 2026**  
 Backend REST em Spring Boot para a plataforma de arquivo digital de documentários.
 
+> 📖 **Documentos complementares:**
+> - [**FLUXOS.md**](FLUXOS.md) — fluxo completo de **cada funcionalidade** (registo, login, upload, streaming, lives, backoffice…), passo a passo, com as funções chamadas
+> - [**pki/README.md**](pki/README.md) — guia completo dos **certificados** (CA, mTLS, enrollment, revogação)
+
 ---
 
 ## Índice
@@ -468,6 +472,8 @@ https://<ip-ou-localhost>:8080/admin/index.html
 ## 10. Segurança PKI / mTLS e Enrollment
 
 O backend implementa uma **PKI completa com TLS mútuo (mTLS)** para encriptar a comunicação (anti-MITM), **identificar cada dispositivo** por certificado e garantir **rastreabilidade**.
+
+> 📖 **Guia completo e detalhado dos certificados:** [`pki/README.md`](pki/README.md) — explica o que é a CA, onde tudo está instalado, como os certificados são atribuídos, os poderes do administrador, a revogação, e a diferença entre **certificado (identidade do dispositivo)** e **JWT (permissões do utilizador)**.
 
 ### Componentes (pasta `pki/`)
 

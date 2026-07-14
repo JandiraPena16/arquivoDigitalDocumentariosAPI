@@ -233,6 +233,38 @@ public class SignalingHandler extends TextWebSocketHandler {
         });
     }
 
+    /**
+     * Interrompe uma live por ordem do ADMINISTRADOR (moderação).
+     * Avisa o emissor E todos os espectadores, e remove a live do registo.
+     *
+     * @return true se a live existia e foi terminada.
+     */
+    public boolean encerrarPorAdmin(String liveId, String motivo) {
+        LiveSession live = registry.porId(liveId).orElse(null);
+        if (live == null) return false;
+
+        ObjectNode fim = mapper.createObjectNode();
+        fim.put("type", "live-ended");
+        fim.put("porAdmin", true);
+        fim.put("motivo", motivo != null && !motivo.isBlank()
+                ? motivo : "A transmissão foi interrompida pelo administrador.");
+
+        // Avisa o emissor (para ele parar de transmitir)
+        WebSocketSession broadcaster = sessoes.get(live.getBroadcasterSessionId());
+        if (broadcaster != null) enviar(broadcaster, fim);
+
+        // Avisa todos os espectadores
+        for (String viewerId : live.getEspectadores()) {
+            WebSocketSession v = sessoes.get(viewerId);
+            if (v != null) enviar(v, fim);
+            espectadorParaLive.remove(viewerId);
+        }
+
+        registry.remover(liveId);
+        log.warn("Live {} INTERROMPIDA pelo administrador. Motivo: {}", liveId, motivo);
+        return true;
+    }
+
     private void aoSair(WebSocketSession session) {
         String liveId = espectadorParaLive.remove(session.getId());
         if (liveId == null) return;

@@ -43,8 +43,10 @@ public class ClientCertFilter extends OncePerRequestFilter {
                 String deviceId = extrairCn(certs[0].getSubjectX500Principal().getName());
                 if (deviceId != null) {
                     if (certificadoService.estaRevogadoPorDevice(deviceId)) {
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                                "Certificado do dispositivo revogado");
+                        // Código explícito -> a app distingue isto de uma falta de permissão normal
+                        JwtFilter.responderJson(response, HttpServletResponse.SC_FORBIDDEN,
+                                "CERT_REVOGADO",
+                                "O acesso deste dispositivo foi revogado. Contacte o administrador.");
                         return;
                     }
                     DispositivoContext.set(deviceId);

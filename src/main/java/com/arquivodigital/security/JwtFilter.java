@@ -43,7 +43,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             if (!jwtUtil.isTokenValido(token)) {
-                chain.doFilter(request, response);
+                // Token expirado/adulterado -> 401 explícito para o cliente saber que deve re-autenticar
+                responderJson(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_INVALIDO",
+                        "A sua sessão expirou. Inicie sessão novamente.");
                 return;
             }
 
@@ -53,7 +55,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
             if (!sessaoActiva) {
                 log.warn("Sessão revogada: {}", sessaoId);
-                chain.doFilter(request, response);
+                responderJson(response, HttpServletResponse.SC_UNAUTHORIZED, "SESSAO_REVOGADA",
+                        "A sua sessão foi terminada. Inicie sessão novamente.");
                 return;
             }
 
@@ -74,5 +77,14 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         chain.doFilter(request, response);
+    }
+
+    /** Resposta JSON com um código que o cliente consegue interpretar (ex.: SESSAO_REVOGADA). */
+    static void responderJson(HttpServletResponse resp, int status, String codigo, String mensagem)
+            throws IOException {
+        resp.setStatus(status);
+        resp.setContentType("application/json;charset=UTF-8");
+        resp.getWriter().write("{\"codigo\":\"" + codigo + "\",\"mensagem\":\"" + mensagem + "\"}");
+        resp.getWriter().flush();
     }
 }
